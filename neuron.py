@@ -14,7 +14,7 @@ from surrogate import Learnable_ActFun1, Learnable_ActFun2
 class LIFNode(torch.nn.Module):
     def __init__(self, tau=0.2, Vth=0.5):
         super(LIFNode, self).__init__()
-        self.tau = torch.tensor(tau)
+        self.tau = torch.tensor(tau, dtype=torch.float)
         self.Vth = Vth
         self.act1 = Learnable_ActFun1.apply
         self.act2 = Learnable_ActFun2.apply
