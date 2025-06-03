@@ -2,7 +2,7 @@
 """
     @Author       : 保持理智
     @Version      : v1.0
-    @Date         : 2025-5-20 11:17:44
+    @Date         : 2025-05-20 09:16:18
     @Description  : Spiking ResNet-19
 """
 import math
@@ -23,6 +23,7 @@ def conv1x1(in_planes, out_planes, stride=1):
 
 
 class BasicBlock(nn.Module):
+    """ Implementation of SEW-ResNet in 'Deep Residual Learning in Spiking Neural Networks (NeurIPS, 2021)' """
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
@@ -62,7 +63,7 @@ class ResNet19(nn.Module):
         self.encode = nn.Sequential(
             tdLayer(
                 nn.Conv2d(3, self.encode_channels, kernel_size=3, stride=1, padding=1, bias=False),
-                tdBatchNorm2d(self.encode_channels, alpha=1.0),
+                tdBatchNorm2d(self.encode_channels),
             ),
             SpikingNeuron(),
         )
@@ -84,12 +85,15 @@ class ResNet19(nn.Module):
         ## fc layer
         self.global_ap = tdLayer(nn.AdaptiveAvgPool2d((1, 1)))
         self.fc = nn.Sequential(
-            tdLayer(nn.Linear(self.planes[-1] * BasicBlock.expansion, 256, bias=True),
-                tdBatchNorm1d(256, alpha=1.0),
+            tdLayer(nn.Linear(self.planes[-1] * BasicBlock.expansion, 256, bias=False),
+                tdBatchNorm1d(256),
             ),
             SpikingNeuron(),
-            tdLayer(nn.Linear(256, self.output_size, bias=True))
+            tdLayer(nn.Linear(256, self.output_size, bias=False))
         )
+
+        ## initialize_weights
+        self._initialize_weights()
 
     def _make_layer(self, block, planes, stride=1):
         downsample = None
@@ -97,9 +101,8 @@ class ResNet19(nn.Module):
             downsample = nn.Sequential(
                 tdLayer(conv1x1(self.inplanes, planes * block.expansion, stride),
                         tdBatchNorm2d(planes * block.expansion)),
-                SpikingNeuron()  # """SEW-ResNet"""
+                SpikingNeuron() # The downsample of SEW-ResNet block
             )
-
         layers = [block(self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
         return nn.Sequential(*layers)
@@ -117,7 +120,9 @@ class ResNet19(nn.Module):
         x = self.fc(x)
         return x
 
-    ## initialize_weights
+    def extra_repr(self):
+        return f'in_channels={self.in_channels}, encode_channels={self.encode_channels}'
+
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

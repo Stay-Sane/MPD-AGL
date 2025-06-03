@@ -2,7 +2,7 @@
 """
     @Author       : 保持理智
     @Version      : v1.0
-    @Date         : 2025-5-20 11:17:44
+    @Date         : 2025-05-20 09:16:18
     @Description  : Data Loader
 """
 import os
@@ -12,6 +12,8 @@ import torchvision
 import numpy as np
 import torch.utils.data
 from torchvision import transforms
+
+from torchvision.transforms import autoaugment
 from data_loader.data_augment import Cutout, CIFAR10Policy, ImageNetPolicy
 
 
@@ -22,7 +24,7 @@ def getDataLoader(data_set, data_type, batch_size, data_augment, num_workers):
     elif data_type == 'CIFAR10-DVS':
         dataset = load_cifar10DVS(data_path, batch_size, data_augment, num_workers)
     else:
-        raise (ValueError('Unsupported dataset'))
+        raise (ValueError('Unavailable dataset'))
     return dataset
 
 
@@ -47,15 +49,14 @@ def load_cifar10(data_path: str, batch_size: int, data_augment: bool, num_worker
 
 
 def load_cifar10DVS(data_path: str, batch_size: int, data_augment: bool, num_workers: int):
-    train_dataset = Cifar10DVS(root=data_path + '/train', transform=data_augment)
-    test_dataset = Cifar10DVS(root=data_path + '/test')
+    train_dataset = Cifar10DVS(root=data_path + '/TET/train', transform=data_augment)
+    test_dataset = Cifar10DVS(root=data_path + '/TET/test')
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_loader, test_loader
 
-
-"From 'Temporal efficient training of spiking neural network via gradient re-weighting'"
 class Cifar10DVS(torch.utils.data.Dataset):
+    """ From 'Temporal efficient training of spiking neural network via gradient re-weighting (ICLR, 2022)' """
     def __init__(self, root, transform=False):
         self.root = os.path.expanduser(root)
         self.transform = transform

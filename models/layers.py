@@ -2,7 +2,7 @@
 """
     @Author       : 保持理智
     @Version      : v1.0
-    @Date         : 2025-5-20 11:17:44
+    @Date         : 2025-05-20 09:16:18
     @Description  : Layers for Network Architecture
 """
 import math
@@ -36,18 +36,18 @@ class SpikingNeuron(nn.Module):
     def __init__(self, use_plif=args.use_plif):
         super().__init__()
         if use_plif:
-            self.neuron = PLIFNode()
+            self.neuron = PLIFNode(args.init_a, args.Vth)
         else:
-            self.neuron = LIFNode()
+            self.neuron = LIFNode(args.tau, args.Vth)
 
     def forward(self, x: torch.Tensor, param: dict=None):
+        if isinstance(x, tuple) and len(x) == 2:
+            x, param = x[0], x[1]
         return self.neuron(x, param)
 
 
 class tdBatchNorm2d(nn.BatchNorm2d):
-    """
-    Implementation of tdBN in 'Going Deeper With Directly-Trained Larger Spiking Neural Networks'
-    """
+    """ Implementation of tdBN in 'Going Deeper With Directly-Trained Larger Spiking Neural Networks (AAAI, 2021)' """
     def __init__(self, num_features, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True, alpha=1.0, Vth=0.5):
         super(tdBatchNorm2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)
         self.alpha = alpha
@@ -81,6 +81,8 @@ class tdBatchNorm2d(nn.BatchNorm2d):
         input = self.alpha * self.Vth * (input - mean[None, None, :, None, None]) / (torch.sqrt(var[None, None, :, None, None] + self.eps))
         if self.affine:
             input = input * self.weight[None, None, :, None, None] + self.bias[None, None, :, None, None]
+
+        """ MPD-AGL: Theorem 1 """
         bn_param = {'tdBN_gammaAve': self.weight.mean([0]).clone().detach(), 'tdBN_betaAve': self.bias.mean([0]).clone().detach()}
         return input, bn_param
 
@@ -122,6 +124,8 @@ class tdBatchNorm1d(nn.BatchNorm1d):
         input = self.alpha * self.Vth * (input - mean[None, None, :]) / (torch.sqrt(var[None, None, :] + self.eps))
         if self.affine:
             input = input * self.weight[None, None, :] + self.bias[None, None, :]
+
+        """ MPD-AGL: Theorem 1 """
         bn_param = {'tdBN_gammaAve': self.weight.mean([0]).clone().detach(), 'tdBN_betaAve': self.bias.mean([0]).clone().detach()}
         return input, bn_param
 
