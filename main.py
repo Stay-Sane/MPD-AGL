@@ -2,10 +2,11 @@
 """
     @Author       : 保持理智
     @Version      : v1.0
-    @Date         : 2025-5-20 11:17:44
+    @Date         : 2025-05-20 09:16:18
     @Description  : Main Function
 """
 import os
+import math
 import time
 import tqdm
 import torch
@@ -13,24 +14,25 @@ import torch.utils.data
 from datetime import datetime
 
 from base_config import args
-from models import ResNet19
 from data_loader import loader
+from models import ResNet19, VGGSNN
 os.environ['CUDA_VISIBLE_DEVICES']='0'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-run_time = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())
-result_path = './results/'+ run_time + '/checkpoints/'
-if not os.path.isdir(result_path):
-    os.makedirs(result_path)
 
-
-def SNN_main():
-    snn = ResNet19.ResNet19(T=args.T)
+def main_SNN():
+    if args.data_type == "CIFAR10":
+        snn = ResNet19.ResNet19(T=args.T)
+    elif args.data_type == "CIFAR10-DVS":
+        snn = VGGSNN.VGGSNN(T=args.T)
+    else:
+        raise (ValueError('Unavailable dataset'))
     snn.to(device)
     print('{}'.format(snn))
+    f_para.write('\n {}'.format(snn))
 
     loss_function = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(snn.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+    optimizer = torch.optim.SGD(snn.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4) # weight_decay=1e-4 for CIFAR10 / 5e-4 for CIFAR10-DVS
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.num_epoch, eta_min=0)
 
     train_loader, test_loader = loader.getDataLoader(args.data_set, args.data_type, args.batch_size,
@@ -38,7 +40,6 @@ def SNN_main():
     start_time = time.time()
     best_acc, best_epoch = 0, 0
     for epoch in range(args.num_epoch):
-        """ training process """
         snn.train()
         total, correct, train_loss = 0., 0., 0.
         for images, labels in tqdm.tqdm(train_loader):
@@ -59,10 +60,9 @@ def SNN_main():
               % (time_point, epoch + 1, args.num_epoch, train_loss, train_acc))
         f_log.write('%s | Epoch [%d/%d], Train_loss: %f, Train_acc: %.2f\n'
                     % (time_point, epoch + 1, args.num_epoch, train_loss, train_acc))
-
         scheduler.step()
 
-        """ interference process """
+
         total, correct, test_loss = 0., 0., 0.
         snn.eval()
         with torch.no_grad():
@@ -99,5 +99,14 @@ def SNN_main():
         f_log.write('best acc is %.2f in epoch %d\n\n' % (best_acc, best_epoch))
 
 if __name__ == '__main__':
+    run_time = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime())
+    result_path = './results/' + args.data_type + '/' + run_time + '/checkpoints/'
+    if not os.path.isdir(result_path):
+        os.makedirs(result_path)
+
+    f_para = open(os.path.join(result_path, 'hyper_parameter.log'), 'w', buffering=1)
+    f_para.write(' Arguments: ')
+    for arg in vars(args):
+        f_para.write('\n\t {:25} : {}'.format(arg, getattr(args, arg)))
     f_log = open(os.path.join(result_path, args.data_type + '.log'), 'a', buffering=1)
-    SNN_main()
+    main_SNN()
